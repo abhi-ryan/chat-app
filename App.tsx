@@ -15,6 +15,7 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
+import { Dropdown } from 'react-native-element-dropdown';
 
 import {
     Colors,
@@ -42,6 +43,31 @@ interface ChatResult {
     model: string;
     prompt_eval_duration: number;
     total_duration: number;
+}
+
+interface ChatModelDetails {
+    format: string;
+    family: string;
+    families: null | any[];
+    parameter_size: string;
+    quantization_level: string;
+}
+
+interface ChatModel {
+    name: string;
+    modified_at: string;
+    size: number;
+    digest: string;
+    details: ChatModelDetails;
+}
+
+interface AllChatModels {
+    models: ChatModel[];
+}
+
+interface DropDownItem {
+    label: string;
+    value: string;
 }
 
 const getGeoLocationAccess = () => {
@@ -73,7 +99,28 @@ const getGeoLocationAccess = () => {
 
 const ML_API_ENDPOINT = 'http://100.98.25.33:8080';
 
-const fetchChatResult = async (prompt: string): Promise<ChatResult> => {
+const fetchAllChatModels = async (): Promise<AllChatModels> => {
+    try {
+        console.log(`fetchAllChatModels: ${ML_API_ENDPOINT}`);
+        const chatModels: Response = await fetch(`${ML_API_ENDPOINT}/api/tags`);
+        console.log(chatModels);
+        if (!chatModels.ok) {
+            console.log('chatModels.status: ', chatModels.status);
+            throw new Error('Error fetching all chat models');
+        }
+        const chatModelsJson: AllChatModels = await chatModels.json();
+        console.log(chatModelsJson);
+        return chatModelsJson;
+    } catch (error) {
+        console.error('Error fetching chat models: ', error);
+        throw new Error('Error fetching all chat models');
+    }
+};
+
+const fetchChatResult = async (
+    prompt: string,
+    model: string,
+): Promise<ChatResult> => {
     try {
         console.log(`fetchChatResult: ${ML_API_ENDPOINT}`);
         const chatResult: Response = await fetch(
@@ -82,7 +129,7 @@ const fetchChatResult = async (prompt: string): Promise<ChatResult> => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'llama2',
+                    model: model,
                     messages: [
                         {
                             role: 'user',
@@ -108,19 +155,20 @@ const fetchChatResult = async (prompt: string): Promise<ChatResult> => {
 };
 
 function ChatComponent(): React.JSX.Element {
-    const [chatPrompt, setChatPrompt] = useState('');
-    const [chatResult, setChatResult] = useState('');
-    const [isLoadingChatResult, setIsLoadingChatResult] = useState(false);
+    const [chatPrompt, setChatPrompt] = useState<string>('');
+    const [chatResult, setChatResult] = useState<string>('');
+    const [isLoadingChatResult, setIsLoadingChatResult] =
+        useState<boolean>(false);
+    const [chatModels, setChatModels] = useState<DropDownItem[]>([]);
+    const [selectedChatModel, setSelectedChatModel] =
+        useState<string>('llama2');
+    const [dropDownFocus, setDropDownFocus] = useState<boolean>(false);
 
     const isDarkMode = useColorScheme() === 'dark';
 
     const backgroundStyle = {
         backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
     };
-
-    useEffect(() => {
-        console.log('Start App!!!');
-    }, []);
 
     useEffect(() => {
         if (isLoadingChatResult) {
@@ -130,22 +178,92 @@ function ChatComponent(): React.JSX.Element {
         }
     }, [isLoadingChatResult]);
 
+    const getAllChatModels = async () => {
+        try {
+            const chatModels: AllChatModels = await fetchAllChatModels();
+            const chatModelsTags: DropDownItem[] = chatModels.models.map(
+                (item: ChatModel) => {
+                    return {
+                        label: item.name,
+                        value: item.name,
+                    } as DropDownItem;
+                },
+            );
+            setChatModels(chatModelsTags);
+            console.log('chatModels: ', chatModelsTags);
+        } catch (error: any) {
+            Alert.alert(error.message);
+        }
+    };
+
     const getChatResult = async () => {
         setIsLoadingChatResult(true);
         try {
             setChatResult('Fetching chat result...');
-            const chatResult = await fetchChatResult(chatPrompt);
+            const chatResult = await fetchChatResult(
+                chatPrompt,
+                selectedChatModel,
+            );
             console.log('chatResult: ', chatResult);
             setChatResult(chatResult.message.content);
         } catch (error: any) {
             Alert.alert(error.message);
+            setChatResult('Error fetching chat result');
         }
         setIsLoadingChatResult(false);
+    };
+
+    const handlChatModelChange = (text: string) => {
+        console.log(text);
     };
 
     const handleChatPromptChange = (text: string) => {
         setChatPrompt(text);
     };
+
+    useEffect(() => {
+        console.log('Start App!!!');
+        getAllChatModels();
+    }, []);
+
+    const dropDownStyle = StyleSheet.create({
+        dropdown: {
+            height: 50,
+            borderColor: isDarkMode ? Colors.white : Colors.black,
+            borderWidth: 1,
+            borderRadius: 8,
+            paddingHorizontal: 8,
+            marginTop: 8,
+            marginBottom: 8,
+        },
+        containerStyle: {
+            backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        },
+        label: {
+            position: 'absolute',
+            backgroundColor: isDarkMode ? Colors.black : Colors.white,
+            left: 22,
+            top: 8,
+            zIndex: 999,
+            paddingHorizontal: 8,
+            fontSize: 14,
+        },
+        placeholderStyle: {
+            fontSize: 16,
+        },
+        selectedTextStyle: {
+            fontSize: 16,
+            color: isDarkMode ? Colors.white : Colors.black,
+        },
+        itemTextStyle: {
+            fontSize: 16,
+            color: isDarkMode ? Colors.white : Colors.black,
+        },
+        inputSearchStyle: {
+            height: 40,
+            fontSize: 16,
+        },
+    });
 
     return (
         <SafeAreaView style={backgroundStyle}>
@@ -164,6 +282,38 @@ function ChatComponent(): React.JSX.Element {
                     multiline={true}
                     numberOfLines={10}
                     onChangeText={handleChatPromptChange}
+                />
+            </View>
+            <View>
+                <Dropdown
+                    style={[dropDownStyle.dropdown]}
+                    placeholderStyle={dropDownStyle.placeholderStyle}
+                    selectedTextStyle={dropDownStyle.selectedTextStyle}
+                    itemTextStyle={dropDownStyle.itemTextStyle}
+                    inputSearchStyle={dropDownStyle.inputSearchStyle}
+                    containerStyle={dropDownStyle.containerStyle}
+                    data={chatModels}
+                    search
+                    maxHeight={300}
+                    // @ts-ignore
+                    labelField="label"
+                    valueField="value"
+                    placeholder={selectedChatModel}
+                    searchPlaceholder="Search..."
+                    value={selectedChatModel}
+                    onFocus={() => setDropDownFocus(true)}
+                    onBlur={() => setDropDownFocus(false)}
+                    onChange={(item: DropDownItem) => {
+                        setSelectedChatModel(item.value);
+                    }}
+                    // renderLeftIcon={() => (
+                    //     <AntDesign
+                    //         style={styles.icon}
+                    //         color={isFocus ? 'blue' : 'black'}
+                    //         name="Safety"
+                    //         size={20}
+                    //     />
+                    // )}
                 />
             </View>
             <Button
