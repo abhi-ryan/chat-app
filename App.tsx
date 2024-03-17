@@ -99,6 +99,40 @@ const getGeoLocationAccess = () => {
 
 const ML_API_ENDPOINT = 'http://100.98.25.33:8080';
 
+const SERVER_ENDPOINT = 'http://100.83.31.159:5432';
+
+const switchOnServer = async () => {
+    try {
+        const response = await fetch(`${SERVER_ENDPOINT}/start`);
+        console.log(response);
+        if (!response.ok) {
+            console.log('response.status: ', response.status);
+            throw new Error('Error switching on server');
+        }
+        Alert.alert('Server switched on');
+    } catch (error) {
+        console.error('Error switching on server: ', error);
+        Alert.alert(`Error switching on server ${error}`);
+        throw new Error('Error switching on server');
+    }
+};
+
+const switchOffServer = async () => {
+    try {
+        const response = await fetch(`${SERVER_ENDPOINT}/stop`);
+        console.log(response);
+        if (!response.ok) {
+            console.log('response.status: ', response.status);
+            throw new Error('Error switching off server');
+        }
+        Alert.alert('Server switched off');
+    } catch (error) {
+        console.error('Error switching off server: ', error);
+        Alert.alert(`Error switching off server ${error}`);
+        throw new Error('Error switching off server');
+    }
+};
+
 const fetchAllChatModels = async (): Promise<AllChatModels> => {
     try {
         console.log(`fetchAllChatModels: ${ML_API_ENDPOINT}`);
@@ -271,6 +305,21 @@ function ChatComponent(): React.JSX.Element {
                 barStyle={isDarkMode ? 'light-content' : 'dark-content'}
                 backgroundColor={backgroundStyle.backgroundColor}
             />
+            <View>
+                <Text>Control Panel</Text>
+                <Button
+                    onPress={switchOnServer}
+                    title="Switch On Server"
+                    color={Colors.primary}
+                    accessibilityLabel="Switch On Server"
+                />
+                <Button
+                    onPress={switchOffServer}
+                    title="Switch Off Server"
+                    color={Colors.primary}
+                    accessibilityLabel="Switch Off Server"
+                />
+            </View>
             <View>
                 <Text>Chat App</Text>
                 <TextInput
